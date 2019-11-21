@@ -21,7 +21,50 @@ done
 ```
 export KUBERNETES_PUBLIC_IP_ADDRESS='192.168.33.100'
 ```
-### Kubernetes Certificate
+
+<details>
+
+```
+cat > ca-config.json <<EOF
+{
+  "signing": {
+    "default": {
+      "expiry": "8760h"
+    },
+    "profiles": {
+      "kubernetes": {
+        "usages": ["signing", "key encipherment", "server auth", "client auth"],
+        "expiry": "8760h"
+      }
+    }
+  }
+}
+EOF
+
+cat > ca-csr.json <<EOF
+{
+  "CN": "Kubernetes",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "US",
+      "L": "Portland",
+      "O": "Kubernetes",
+      "OU": "CA",
+      "ST": "Oregon"
+    }
+  ]
+}
+EOF
+
+cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+```
+</details>
+
+### The Kubernetes API Server Certificate
 <details>
 
 ```
@@ -36,8 +79,12 @@ cat > kubernetes-csr.json <<EOF
     "192.168.33.101",
     "192.168.33.102",
     "192.168.33.103",
+    "kubernetes",
+    "kubernetes.default",
+    "kubernetes.default.svc",
+    "kubernetes.default.svc.cluster",
+    "kubernetes.svc.cluster.local",
     "kubernetes.example.com",
-    "${KUBERNETES_PUBLIC_IP_ADDRESS}",
     "10.14.20.127",
     "localhost",
     "127.0.0.1"
@@ -48,18 +95,16 @@ cat > kubernetes-csr.json <<EOF
   },
   "names": [
     {
-      "C": "NO",
-      "L": "Oslo",
+      "C": "US",
+      "L": "Portland",
       "O": "Kubernetes",
-      "OU": "Cluster",
-      "ST": "Oslo"
+      "OU": "Kubernetes The Hard Way",
+      "ST": "Oregon"
     }
   ]
 }
 EOF
-```
 
-```
 cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
@@ -283,7 +328,6 @@ do
 done
 ```
 
-
 ## The Encryption Config File
 <details>
 
@@ -364,7 +408,9 @@ kubectl config use-context default --kubeconfig=kube-scheduler.kubeconfig
 ```
 </details>
 
-### The kubelet
+### The kubelet Kubernetes Configuration File
+<details>
+
 ```
 for instance in worker1 worker2; do
   kubectl config set-cluster kubernetes-the-hard-way \
@@ -387,6 +433,8 @@ for instance in worker1 worker2; do
   kubectl config use-context default --kubeconfig=${instance}.kubeconfig
 done
 ```
+</details>
+
 ### The kube-proxy Kubernetes Configuration File
 <details>
 
@@ -412,12 +460,11 @@ kubectl config use-context default --kubeconfig=kube-proxy.kubeconfig
 ```
 </details>
 
+### Copy Configuration File
 ```
 for instance in master1 master2 master3
 do
   scp kube-controller-manager.kubeconfig kube-scheduler.kubeconfig ${instance}:~
-  ssh ${instance} "\
-  "
 done
 ```
 ```
@@ -426,7 +473,6 @@ do
   scp ${instance}.kubeconfig kube-proxy.kubeconfig ${instance}:~
 done
 ```
-
 
 ## etcd
 <details>
@@ -438,16 +484,16 @@ do
   sudo mkdir -p /etc/etcd/
   ls /etc/etcd/
   sudo mv ca.pem kubernetes-key.pem kubernetes.pem /etc/etcd/
-  curl -L https://github.com/coreos/etcd/releases/download/v3.2.28/etcd-v3.2.28-linux-amd64.tar.gz \
-    -o etcd-v3.2.28-linux-amd64.tar.gz
-  tar xzvf etcd-v3.2.28-linux-amd64.tar.gz 
-  sudo cp etcd-v3.2.28-linux-amd64/etcd* /usr/bin/
+  curl -L https://github.com/coreos/etcd/releases/download/v3.4.0/etcd-v3.4.0-linux-amd64.tar.gz \
+    -o etcd-v3.4.0-linux-amd64.tar.gz
+  tar xzvf etcd-v3.4.0-linux-amd64.tar.gz 
+  sudo cp etcd-v3.4.0-linux-amd64/etcd* /usr/bin/
   sudo mkdir -p /var/lib/etcd
   "
 done
 ```
-</details>
 
+### Configure the etcd Server
 ```
 for instance in 1 2 3
 do
@@ -487,6 +533,7 @@ EOF
   ssh master${instance} "sudo mv etcd.service /etc/systemd/system/"
 done
 ```
+</details>
 
 <details>
 
@@ -513,6 +560,8 @@ done
 ```
 
 ## Kubernetes Controller
+### Download and Install the Kubernetes Controller Binaries
+<details>
 
 ```
 for instance in master1 master2 master3
@@ -523,40 +572,20 @@ do
   sudo mkdir -p /etc/kubernetes/config
   sudo mv ca.pem kubernetes-key.pem kubernetes.pem service-account.pem /var/lib/kubernetes/
   sudo mv encryption-config.yaml /var/lib/kubernetes/
-  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.6/bin/linux/amd64/kube-apiserver
-  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.6/bin/linux/amd64/kube-controller-manager
-  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.6/bin/linux/amd64/kube-scheduler
-  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.6/bin/linux/amd64/kubectl
+  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/amd64/kube-apiserver
+  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/amd64/kube-controller-manager
+  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/amd64/kube-scheduler
+  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/amd64/kubectl
   chmod +x kube-apiserver kube-controller-manager kube-scheduler kubectl
   sudo mv kube-apiserver kube-controller-manager kube-scheduler kubectl /usr/local/bin/
   "
 done
 ```
+</details>
 
-```
-cat > token.csv <<"EOF"
-chAng3m3,admin,admin
-chAng3m3,scheduler,scheduler
-chAng3m3,kubelet,kubelet
-EOF
-cat > authorization-policy.jsonl <<"EOF"
-{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user":"*", "nonResourcePath": "*", "readonly": true}}
-{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user":"admin", "namespace": "*", "resource": "*", "apiGroup": "*"}}
-{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user":"scheduler", "namespace": "*", "resource": "*", "apiGroup": "*"}}
-{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"user":"kubelet", "namespace": "*", "resource": "*", "apiGroup": "*"}}
-{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {"group":"system:serviceaccounts", "namespace": "*", "resource": "*", "apiGroup": "*", "nonResourcePath": "*"}}
-EOF
-for instance in 1 2 3
-do
-  scp token.csv authorization-policy.jsonl master${instance}:~
-  ssh master${instance} "\
-  sudo mv token.csv /var/lib/kubernetes/
-  sudo mv authorization-policy.jsonl /var/lib/kubernetes/
-  "
-done
-```
+### Configure the Kubernetes API Server
+<details>
 
-### Kubernetes API Server
 ```
 for instance in 1 2 3
 do
@@ -618,6 +647,8 @@ do
   "
 done
 ```
+</details>
+
 ```
 for instance in 1 2 3
 do
@@ -626,7 +657,9 @@ do
   "
 done
 ```
-### Kubernetes Controller Manager
+### Configure the Kubernetes Controller Manager
+<details>
+
 ```
 for instance in 1 2 3
 do
@@ -676,6 +709,8 @@ do
   "
 done
 ```
+</details>
+
 ```
 for instance in 1 2 3
 do
@@ -685,7 +720,9 @@ do
 done
 ```
 
-### Kubernetes Scheduler
+### Configure the Kubernetes Scheduler
+<details>
+
 ```
 cat > kube-scheduler.yaml <<"EOF"
 apiVersion: kubescheduler.config.k8s.io/v1alpha1
@@ -732,6 +769,8 @@ do
   "
 done
 ```
+</details>
+
 ```
 for instance in 1 2 3
 do
@@ -750,6 +789,8 @@ do
 done
 ```
 ## Bootstrapping Kubernetes Workers
+<details>
+
 ```
 for instance in 1 2
 do
@@ -768,9 +809,9 @@ do
   wget -nv https://github.com/opencontainers/runc/releases/download/v1.0.0-rc8/runc.amd64 
   wget -nv https://github.com/containernetworking/plugins/releases/download/v0.8.2/cni-plugins-linux-amd64-v0.8.2.tgz
   wget -nv https://github.com/containerd/containerd/releases/download/v1.2.9/containerd-1.2.9.linux-amd64.tar.gz
-  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.6/bin/linux/amd64/kubectl
-  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.6/bin/linux/amd64/kube-proxy
-  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.6/bin/linux/amd64/kubelet
+  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/amd64/kubectl
+  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/amd64/kube-proxy
+  wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/amd64/kubelet
   sudo mkdir -p /etc/cni/net.d
   sudo mkdir -p /opt/cni/bin
   sudo mkdir -p /var/lib/kubelet
@@ -788,8 +829,11 @@ do
   "
 done
 ```
+</details>
 
 ### Configure CNI Networking
+<details>
+
 ```
 cat > 99-loopback.conf <<EOF
 {
@@ -826,7 +870,11 @@ EOF
 done
 rm 10-bridge.conf 99-loopback.conf
 ```
+</details>
+
 ### Configure containerd
+<details>
+
 ```
 cat > config.toml <<"EOF"
 [plugins]
@@ -889,6 +937,7 @@ do
   "
 done
 ```
+</details>
 
 ### Configure the Kubelet
 ```
@@ -1105,23 +1154,23 @@ done
 
 ## The Admin Kubernetes configuration File
 ```
-./kubectl config set-cluster kubernetes-the-hard-way \
+kubectl config set-cluster kubernetes-the-hard-way \
   --certificate-authority=ca.pem \
   --embed-certs=true \
   --server=https://10.14.20.127:6443 \
   --kubeconfig=admin.kubeconfig
 
-./kubectl config set-credentials admin \
+kubectl config set-credentials admin \
   --client-certificate=admin.pem \
   --client-key=admin-key.pem \
   --kubeconfig=admin.kubeconfig
 
-./kubectl config set-context kubernetes-the-hard-way \
+kubectl config set-context kubernetes-the-hard-way \
   --cluster=kubernetes-the-hard-way \
   --user=admin \
   --kubeconfig=admin.kubeconfig
 
-./kubectl config use-context kubernetes-the-hard-way \
+kubectl config use-context kubernetes-the-hard-way \
   --kubeconfig=admin.kubeconfig
 ```
 
