@@ -1,6 +1,12 @@
 # kubernetes-the-hard-way-on-vagrant
 This document is a version for vagrant environment of the Kubernetes the Hard Way. It follows Kelsey Hightower's tutorial https://github.com/kelseyhightower/kubernetes-the-hard-way, and attempts to make improvements and explanations where needed. So here we go.
 
+## Clean up
+
+```
+rm config.toml *.yaml *.service *.pem *.json *.kubeconfig *.csr
+```
+
 ## Confirm the connectivity
 <details>
 <summary>Click to expand!</summary>
@@ -408,6 +414,30 @@ kubectl config use-context default --kubeconfig=kube-scheduler.kubeconfig
 ```
 </details>
 
+### The admin Kubernetes Configuration File
+<details>
+
+```
+kubectl config set-cluster kubernetes-the-hard-way \
+  --certificate-authority=ca.pem \
+  --embed-certs=true \
+  --server=https://127.0.0.1:6443 \
+  --kubeconfig=admin.kubeconfig
+
+kubectl config set-credentials admin \
+  --client-certificate=admin.pem \
+  --client-key=admin-key.pem \
+  --embed-certs=true \
+  --kubeconfig=admin.kubeconfig
+
+kubectl config set-context default \
+  --cluster=kubernetes-the-hard-way \
+  --user=admin \
+  --kubeconfig=admin.kubeconfig
+
+kubectl config use-context default --kubeconfig=admin.kubeconfig
+```
+</details>
 ### The kubelet Kubernetes Configuration File
 <details>
 
@@ -464,7 +494,7 @@ kubectl config use-context default --kubeconfig=kube-proxy.kubeconfig
 ```
 for instance in master1 master2 master3
 do
-  scp kube-controller-manager.kubeconfig kube-scheduler.kubeconfig ${instance}:~
+  scp kube-controller-manager.kubeconfig kube-scheduler.kubeconfig admin.kubeconfig ${instance}:~
 done
 ```
 ```
@@ -474,7 +504,7 @@ do
 done
 ```
 
-## etcd
+## Bootstrapping etcd
 <details>
 
 ```
@@ -492,8 +522,11 @@ do
   "
 done
 ```
+</details>
 
 ### Configure the etcd Server
+<details>
+
 ```
 for instance in 1 2 3
 do
@@ -512,7 +545,7 @@ ExecStart=/usr/bin/etcd --name ETCD_NAME \
   --peer-trusted-ca-file=/etc/etcd/ca.pem \
   --initial-advertise-peer-urls https://INTERNAL_IP:2380 \
   --listen-peer-urls https://INTERNAL_IP:2380 \
-  --listen-client-urls https://INTERNAL_IP:2379,http://127.0.0.1:2379 \
+  --listen-client-urls https://INTERNAL_IP:2379,https://127.0.0.1:2379 \
   --advertise-client-urls https://INTERNAL_IP:2379 \
   --initial-cluster-token etcd-cluster-0 \
   --initial-cluster master1=https://192.168.33.101:2380,master2=https://192.168.33.102:2380,master3=https://192.168.33.103:2380 \
@@ -533,9 +566,6 @@ EOF
   ssh master${instance} "sudo mv etcd.service /etc/systemd/system/"
 done
 ```
-</details>
-
-<details>
 
 ```
 for instance in 1 2 3
@@ -550,16 +580,24 @@ done
 </details>
 
 ### Verification
+<details>
+
 ```
 for instance in 1 2 3
 do
   ssh master${instance} "\
-  etcdctl --ca-file=/etc/etcd/ca.pem cluster-health
+  echo ========= master${instance} =========
+  sudo ETCDCTL_API=3 etcdctl member list \\
+    --endpoints=https://127.0.0.1:2379 \\
+    --cacert=/etc/etcd/ca.pem \\
+    --cert=/etc/etcd/kubernetes.pem \\
+    --key=/etc/etcd/kubernetes-key.pem
   "
 done
 ```
+</details>
 
-## Kubernetes Controller
+## Bootstrapping Kubernetes Controller
 ### Download and Install the Kubernetes Controller Binaries
 <details>
 
@@ -570,7 +608,7 @@ do
   ssh ${instance} "\
   sudo mkdir -p /var/lib/kubernetes
   sudo mkdir -p /etc/kubernetes/config
-  sudo mv ca.pem kubernetes-key.pem kubernetes.pem service-account.pem /var/lib/kubernetes/
+  sudo mv ca-key.pem ca.pem kubernetes-key.pem kubernetes.pem service-account.pem service-account-key.pem /var/lib/kubernetes/
   sudo mv encryption-config.yaml /var/lib/kubernetes/
   wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/amd64/kube-apiserver
   wget -nv https://storage.googleapis.com/kubernetes-release/release/v1.15.3/bin/linux/amd64/kube-controller-manager
@@ -649,6 +687,7 @@ done
 ```
 </details>
 
+### Verification
 ```
 for instance in 1 2 3
 do
@@ -675,7 +714,7 @@ ExecStart=/usr/local/bin/kube-controller-manager \
   --cluster-name=kubernetes \
   --cluster-signing-cert-file=/var/lib/kubernetes/ca.pem \
   --cluster-signing-key-file=/var/lib/kubernetes/ca-key.pem \
-  --kubeconfig=/var/lib/kubernetes/kube-controller-manager.kubeconfig \\
+  --kubeconfig=/var/lib/kubernetes/kube-controller-manager.kubeconfig \
   --leader-elect=true \
   --root-ca-file=/var/lib/kubernetes/ca.pem \
   --service-account-private-key-file=/var/lib/kubernetes/service-account-key.pem \
@@ -711,6 +750,9 @@ done
 ```
 </details>
 
+### Verification
+<details>
+
 ```
 for instance in 1 2 3
 do
@@ -719,6 +761,7 @@ do
   "
 done
 ```
+</details>
 
 ### Configure the Kubernetes Scheduler
 <details>
@@ -788,14 +831,45 @@ do
   "
 done
 ```
+### RBAC for Kubelet Authorization
+<details>
+
+```
+ssh master1
+
+cat <<EOF | kubectl apply --kubeconfig admin.kubeconfig -f -
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: system:kube-apiserver-to-kubelet
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/proxy
+      - nodes/stats
+      - nodes/log
+      - nodes/spec
+      - nodes/metrics
+    verbs:
+      - "*"
+EOF
+```
+</details>
+
 ## Bootstrapping Kubernetes Workers
+### Download and Install Worker Binaries
 <details>
 
 ```
 for instance in 1 2
 do
   ssh worker${instance} "\
-  sudo yum install -y socat conntrack ipset
+  sudo apt-get install -y socat conntrack ipset
   sudo swapoff -a
   "
 done
@@ -940,6 +1014,8 @@ done
 </details>
 
 ### Configure the Kubelet
+<details>
+
 ```
 for instance in 1 2
 do
@@ -989,7 +1065,6 @@ rm kubelet-config.yaml
 for instance in 1 2
 do
 cat > kubelet.service <<"EOF"
- | sudo tee /etc/systemd/system/kubelet.service
 [Unit]
 Description=Kubernetes Kubelet
 Documentation=https://github.com/kubernetes/kubernetes
@@ -1024,36 +1099,6 @@ done
 rm kubelet.service
 ```
 
-### Create temporary kubeconfig file:
-```
-cat > kubeconfig <<"EOF"
-apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    certificate-authority: /var/lib/kubernetes/ca.pem
-    server: https://192.168.33.101:6443
-  name: kubernetes
-contexts:
-- context:
-    cluster: kubernetes
-    user: kubelet
-  name: kubelet
-current-context: kubelet
-users:
-- name: kubelet
-  user:
-    token: chAng3m3
-EOF
-for instance in 1 2
-do
-  scp kubeconfig worker${instance}:~
-  ssh worker${instance} "\
-  sudo mv kubeconfig /var/lib/kubelet/
-  "
-done
-rm kubeconfig
-```
 ```
 for instance in 1 2
 do
@@ -1064,6 +1109,11 @@ do
   "
 done
 ```
+</details>
+
+### Verification
+<details>
+
 ```
 for instance in 1 2
 do
@@ -1072,10 +1122,10 @@ do
   "
 done
 ```
+</details>
 
-## Configure the Kube-proxy
+### Configure the Kube-proxy
 <details>
-<summary>Click to expand!</summary>
 
 ```
 cat > kube-proxy-config.yaml << "EOF"
@@ -1177,5 +1227,6 @@ kubectl config use-context kubernetes-the-hard-way \
 ```
 KUBECONFIG=admin.kubeconfig kubectl get node
 ```
-
-
+```
+kubectl create deployment nginx --image=nginx --kubeconfig admin.kubeconfig
+```
