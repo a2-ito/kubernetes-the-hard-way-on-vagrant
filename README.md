@@ -1,15 +1,45 @@
 # kubernetes-the-hard-way-on-vagrant
 This document is a version for vagrant environment of the Kubernetes the Hard Way. It follows Kelsey Hightower's tutorial https://github.com/kelseyhightower/kubernetes-the-hard-way, and attempts to make improvements and explanations where needed. So here we go.
 
+## Prerequisites
+
+- Install CFSSL
+- Install kubectl
+
+## Compute Resources
+In my environment, these following servers are deployed on my VirtualBox envirronment via Vagrant.
+My laptop has Core i5-5300U (4 vCPU), 16 GB RAM, and 250 GB local storage.
+I was concerned about shortage of compute resources before bootstrapping, but there has been no issues relative with 
+compute resources so far.
+
+- master1 - 192.168.33.101
+- master2 - 192.168.33.102
+- master3 - 192.168.33.103
+- worker1 - 192.168.33.111
+- worker2 - 192.168.33.112
+
+### Software Version
+```
+OS Ubuntu 18.04.3 LTS
+kube-apiserver
+kube-controller-manager
+kube-scheduler
+kubelet
+kube-proxy
+```
+
 ## Clean up
+This will be used to clean up all confiuration files when we want to retry.
 
 ```
 rm config.toml *.yaml *.service *.pem *.json *.kubeconfig *.csr
 ```
 
-## Confirm the connectivity
+## Confirm the connectivity to all nodes
+There are assumptions of this document to connect these VMs without password via SSH keys.
+Please make sure that the VMs can be connected by SSH keys.
+
 <details>
-<summary>Click to expand!</summary>
 
 ```
 for instance in 1 2 3; do
@@ -438,6 +468,7 @@ kubectl config set-context default \
 kubectl config use-context default --kubeconfig=admin.kubeconfig
 ```
 </details>
+
 ### The kubelet Kubernetes Configuration File
 <details>
 
