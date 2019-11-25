@@ -32,9 +32,7 @@ Vagrant.configure("2") do |config|
   config.vm.define "master1" do |master1|
     master1.vm.hostname = "master1"
     master1.vm.network "forwarded_port", guest: 22, host: 2201, host_ip: "0.0.0.0"
-    master1.vm.network "forwarded_port", guest: 6443, host: 6443, host_ip: "0.0.0.0"
     master1.vm.network "forwarded_port", guest: 6443, host: 64431, host_ip: "0.0.0.0"
-    master1.vm.network "private_network", ip: "192.168.33.100"
     master1.vm.network "private_network", ip: "192.168.33.101"
     #master1.ssh.private_key_path = ["keys/private_key", "~/.vagrant.d/insecure_private_key"]
     #master1.vm.provision "file", source: "keys/public", destination: "~/.ssh/authorized_keys"
@@ -67,6 +65,14 @@ Vagrant.configure("2") do |config|
     worker2.vm.network "forwarded_port", guest: 22, host: 2205, host_ip: "0.0.0.0"
     worker2.vm.network "private_network", ip: "192.168.33.112"
     worker2.vm.provision "shell", inline: $script
+  end
+  config.vm.define "lb" do |lb|
+    lb.vm.hostname = "lb"
+    lb.vm.network "forwarded_port", guest: 22, host: 2206, host_ip: "0.0.0.0"
+    lb.vm.network "forwarded_port", guest: 6443, host: 6443, host_ip: "0.0.0.0"
+    lb.vm.network "forwarded_port", guest: 443, host: 443, host_ip: "0.0.0.0"
+    lb.vm.network "private_network", ip: "192.168.33.100"
+    lb.vm.provision "shell", inline: $script
   end
 
   #config.vm.network "forwarded_port", guest: 22, host: 2201, host_ip: "0.0.0.0"
