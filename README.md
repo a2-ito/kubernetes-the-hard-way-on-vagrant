@@ -17,6 +17,7 @@ compute resources so far.
 - master3 - 192.168.33.103
 - worker1 - 192.168.33.111
 - worker2 - 192.168.33.112
+- lb - 192.168.33.100
 
 ### Software Version
 ```
@@ -26,13 +27,14 @@ kube-controller-manager
 kube-scheduler
 kubelet
 kube-proxy
+nginx (lb)
 ```
 
 ## Clean up
 This will be used to clean up all confiuration files when we want to retry.
 
 ```
-rm config.toml *.yaml *.service *.pem *.json *.kubeconfig *.csr
+rm config.toml *.conf *.yaml *.service *.pem *.json *.kubeconfig *.csr
 ```
 
 ## Confirm the connectivity to all nodes
@@ -50,8 +52,26 @@ done
 for instance in 1 2; do
   ssh worker${instance} "hostname"
 done
+ssh lb "hostname"
 ```
 </details>
+
+### Edit hosts
+<details>
+
+```
+for instance in 1 2 3; do
+  ssh master${instance} "\
+  sudo sh -c "echo 192.168.33.111 worker1 > /etc/hosts"
+  sudo sh -c "echo 192.168.33.112 worker2 > /etc/hosts"
+  "
+done
+```
+
+</details>
+
+
+
 
 ## Certificate Authority
 ```
@@ -106,7 +126,7 @@ cfssl gencert -initca ca-csr.json | cfssljson -bare ca
 ```
 cat > kubernetes-csr.json <<EOF
 {
-  "CN": "*.example.com",
+  "CN": "kubernetes",
   "hosts": [
     "10.32.0.1",
     "master1",
@@ -123,7 +143,8 @@ cat > kubernetes-csr.json <<EOF
     "kubernetes.example.com",
     "10.14.20.127",
     "localhost",
-    "127.0.0.1"
+    "127.0.0.1",
+    "192.168.33.100"
   ],
   "key": {
     "algo": "rsa",
@@ -354,7 +375,7 @@ cfssl gencert \
 ```
 for instance in master1 master2 master3
 do
-  scp ca.pem kubernetes-key.pem kubernetes.pem service-account.pem ${instance}:~
+  scp ca-key.pem ca.pem kubernetes-key.pem kubernetes.pem service-account.pem ${instance}:~
 done
 ```
 ```
@@ -477,7 +498,7 @@ for instance in worker1 worker2; do
   kubectl config set-cluster kubernetes-the-hard-way \
     --certificate-authority=ca.pem \
     --embed-certs=true \
-    --server=https://192.168.33.101:6443 \
+    --server=https://192.168.33.100:6443 \
     --kubeconfig=${instance}.kubeconfig
 
   kubectl config set-credentials system:node:${instance} \
@@ -503,7 +524,7 @@ done
 kubectl config set-cluster kubernetes-the-hard-way \
   --certificate-authority=ca.pem \
   --embed-certs=true \
-  --server=https://192.168.33.101:6443 \
+  --server=https://192.168.33.100:6443 \
   --kubeconfig=kube-proxy.kubeconfig
 
 kubectl config set-credentials system:kube-proxy \
@@ -635,7 +656,7 @@ done
 ```
 for instance in master1 master2 master3
 do
-  scp ca.pem kubernetes-key.pem kubernetes.pem service-account.pem ${instance}:~
+  scp ca-key.pem ca.pem kubernetes-key.pem kubernetes.pem service-account-key.pem service-account.pem ${instance}:~
   ssh ${instance} "\
   sudo mkdir -p /var/lib/kubernetes
   sudo mkdir -p /etc/kubernetes/config
@@ -892,7 +913,80 @@ EOF
 ```
 </details>
 
+### Bind the ```system:kube-apiserver-to-kubelet``` ClusterRole to the ```kubernetes``` user:
+<details>
+
+``` 
+cat <<EOF | kubectl apply --kubeconfig admin.kubeconfig -f -
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: system:kube-apiserver
+  namespace: ""
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:kube-apiserver-to-kubelet
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: kubernetes
+EOF
+``` 
+</details>
+
+### Deploying the Load Balancer
+<details>
+
+```
+ssh lb "\
+  sudo apt-get update
+  sudo apt-get install -y nginx
+"
+```
+
+```
+ssh lb
+```
+
+```
+sudo sh -c "echo include /etc/nginx/tcpconf.d/*\; >> /etc/nginx/nginx.conf"
+```
+
+```
+sudo mkdir -p /etc/nginx/tcpconf.d
+sudo su - 
+cat > /etc/nginx/tcpconf.d/lb <<"EOF"
+stream {
+    upstream kubernetes_api_servers {
+        # Our web server, listening for SSL traffic
+        # Note the web server will expect traffic
+        # at this xip.io "domain", just for our
+        # example here
+        server 192.168.33.101:6443;
+        server 192.168.33.102:6443;
+        server 192.168.33.103:6443;
+    }
+
+    server {
+        listen 6443;
+        proxy_pass kubernetes_api_servers;
+    }
+}
+EOF
+```
+```
+sudo systemctl restart nginx
+```
+</details>
+
+### Verification
+```
+kubectl get node --kubeconfig admin.kubeconfig
+```
+
 ## Bootstrapping Kubernetes Workers
+
 ### Download and Install Worker Binaries
 <details>
 
@@ -1053,7 +1147,6 @@ do
   scp ca.pem worker${instance}-key.pem worker${instance}.pem worker${instance}.kubeconfig worker${instance}:~
   ssh worker${instance} "\
   sudo mv worker${instance}-key.pem worker${instance}.pem /var/lib/kubelet/
-  sudo mv worker${instance}.kubeconfig /var/lib/kubelet/kubeconfig
   sudo mv ca.pem /var/lib/kubernetes/
   "
 done
@@ -1258,6 +1351,35 @@ kubectl config use-context kubernetes-the-hard-way \
 ```
 KUBECONFIG=admin.kubeconfig kubectl get node
 ```
+
+### Verification
 ```
-kubectl create deployment nginx --image=nginx --kubeconfig admin.kubeconfig
+kubectl get node --kubeconfig admin.kubeconfig
 ```
+
+## Deploying the DNS Cluster Add-on
+
+### The DNS Cluster Add-on
+Deploy the ```coredns``` cluster add-on:
+
+```
+kubectl apply -f https://storage.googleapis.com/kubernetes-the-hard-way/coredns.yaml \
+  --kubeconfig admin.kubeconfig
+```
+
+```
+kubectl get pods --kubeconfig admin.kubeconfig \
+  -l k8s-app=kube-dns -n kube-system
+```
+```
+kubectl run --kubeconfig admin.kubeconfig \
+  --generator=run-pod/v1 busybox --image=busybox:1.28 --command -- sleep 3600
+```
+
+```
+kubectl exec --kubeconfig admin.kubeconfig -ti busybox -- nslookup kubernetes
+```
+
+
+
+
