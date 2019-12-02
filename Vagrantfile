@@ -57,12 +57,16 @@ Vagrant.configure("2") do |config|
   config.vm.define "worker1" do |worker1|
     worker1.vm.hostname = "worker1"
     worker1.vm.network "forwarded_port", guest: 22, host: 2204, host_ip: "0.0.0.0"
+    worker1.vm.network "forwarded_port", guest: 30080, host: 30081, host_ip: "0.0.0.0"
+    worker1.vm.network "forwarded_port", guest: 8080, host: 8081, host_ip: "0.0.0.0"
     worker1.vm.network "private_network", ip: "192.168.33.111"
     worker1.vm.provision "shell", inline: $script
   end
   config.vm.define "worker2" do |worker2|
     worker2.vm.hostname = "worker2"
     worker2.vm.network "forwarded_port", guest: 22, host: 2205, host_ip: "0.0.0.0"
+    worker2.vm.network "forwarded_port", guest: 30080, host: 30082, host_ip: "0.0.0.0"
+    worker2.vm.network "forwarded_port", guest: 8080, host: 8082, host_ip: "0.0.0.0"
     worker2.vm.network "private_network", ip: "192.168.33.112"
     worker2.vm.provision "shell", inline: $script
   end
