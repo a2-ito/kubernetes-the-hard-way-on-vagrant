@@ -195,6 +195,8 @@ done
 rm kubelet-config.yaml
 ```
 
+### Configure ```kubelet.service```
+```--authentication-token-webhook``` and ```--authorization-mode``` will be configured for prerequisite of ```kube-prometheus```.
 ```
 for instance in 1 2
 do
@@ -215,6 +217,8 @@ ExecStart=/usr/local/bin/kubelet \
   --network-plugin=cni \
   --register-node=true \
   --node-ip=INTERNAL_IP \
+  --authentication-token-webhook=true \
+  --authorization-mode=Webhook \
   --v=2
 Restart=on-failure
 RestartSec=5

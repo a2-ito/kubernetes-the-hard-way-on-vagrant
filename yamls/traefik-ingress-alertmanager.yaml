@@ -1,0 +1,15 @@
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: traefik-alertmanager
+  namespace: monitoring
+spec:
+  rules:
+  - host: alertmanager.laptop2-cluster.local
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: alertmanager-main
+          servicePort: 9093

@@ -13,17 +13,6 @@ compute resources so far.
 - worker2 - 192.168.33.112
 - lb - 192.168.33.100
 
-### Software Version
-```
-OS Ubuntu 18.04.3 LTS
-kube-apiserver
-kube-controller-manager
-kube-scheduler
-kubelet
-kube-proxy
-nginx (lb)
-```
-
 ## Clean up
 This will be used to clean up all confiuration files when we want to retry.
 
