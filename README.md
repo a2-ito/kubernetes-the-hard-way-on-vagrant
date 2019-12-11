@@ -13,6 +13,8 @@ kube-apiserver
 kube-controller-manager
 kube-scheduler
 kubelet
+containerd
+runc
 kube-proxy
 nginx (lb)
 ```

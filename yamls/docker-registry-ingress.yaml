@@ -1,0 +1,18 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-docker-registry
+  namespace: docker-registry
+spec:
+  tls:
+  - hosts:
+    - registry.laptop2-cluster.local
+    secretName: secret-docker-registry
+  rules:
+  - host: registry.laptop2-cluster.local
+    http:
+      paths:
+      - backend:
+          serviceName: docker-registry
+          servicePort: 5000
+        path: /

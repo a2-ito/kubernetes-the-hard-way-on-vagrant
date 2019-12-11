@@ -14,7 +14,7 @@ kubectl create -f kube-prometheus/manifests
 ## Patch Eternal-IP
 ```
 kubectl patch svc traefik-web-ui -n kube-system \
-  -p '{"spec": {"type": "LoadBalancer", "externalIPs":["10.14.20.127"]}}'
+  -p '{"spec": {"type": "LoadBalancer", "externalIPs":["10.0.2.15"]}}'
 ```
 
 ## Option: Delete kube-prometheus
