@@ -33,7 +33,6 @@ spec:
           emptyDir: {}
 
 ---
-
 kind: Service
 apiVersion: v1
 metadata:

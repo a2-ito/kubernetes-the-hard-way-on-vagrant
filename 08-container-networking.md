@@ -36,6 +36,8 @@ done
 ```
 
 ## Option: permanently
+It seems that Vagrant does not support static routes at the moment. Therefore, these configurations below would not work well. 
+
 ```
 for instance in 1 2
 do
