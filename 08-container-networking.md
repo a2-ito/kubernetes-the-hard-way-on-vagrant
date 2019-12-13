@@ -43,13 +43,13 @@ do
   1)
   ssh worker${instance} "\
     sudo sh -c \"route add -net 10.200.2.0 netmask 255.255.255.0 gw 192.168.33.112\"
-    sudo sh -c \"echo up route add -net 10.200.2.0 netmask 255.255.255.0 gw 192.168.33.112 >> /etc/network/interfaces\"
+    sudo sh -c \"echo up route add -net 10.200.2.0 netmask 255.255.255.0 gw 192.168.33.112 dev eth1 >> /etc/network/interfaces\"
   "
   ;;
   2)
   ssh worker${instance} "\
     sudo sh -c \"route add -net 10.200.1.0 netmask 255.255.255.0 gw 192.168.33.112\"
-    sudo sh -c \"echo up route add -net 10.200.1.0 netmask 255.255.255.0 gw 192.168.33.111 >> /etc/network/interfaces\"
+    sudo sh -c \"echo up route add -net 10.200.1.0 netmask 255.255.255.0 gw 192.168.33.111 dev eth1 >> /etc/network/interfaces\"
   "
   ;;
   *)

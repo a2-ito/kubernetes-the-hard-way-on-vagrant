@@ -57,18 +57,46 @@ Vagrant.configure("2") do |config|
   config.vm.define "worker1" do |worker1|
     worker1.vm.hostname = "worker1"
     worker1.vm.network "forwarded_port", guest: 22, host: 2204, host_ip: "0.0.0.0"
+    # Service for Grafana
     worker1.vm.network "forwarded_port", guest: 30080, host: 30081, host_ip: "0.0.0.0"
-    worker1.vm.network "forwarded_port", guest: 8080, host: 8081, host_ip: "0.0.0.0"
+    # Service for Prometheus
+    worker1.vm.network "forwarded_port", guest: 30090, host: 30091, host_ip: "0.0.0.0"
+    # Service for Traefik Dashboard
+    worker1.vm.network "forwarded_port", guest: 30000, host: 30001, host_ip: "0.0.0.0"
+    # Service for Alertmanager
+    worker1.vm.network "forwarded_port", guest: 30093, host: 30193, host_ip: "0.0.0.0"
+    worker1.vm.network "forwarded_port", guest: 80, host: 10081, host_ip: "0.0.0.0"
+
+    # Service for Docker Registry
+    worker1.vm.network "forwarded_port", guest: 30500, host: 30501, host_ip: "0.0.0.0"
+
     worker1.vm.network "private_network", ip: "192.168.33.111"
     worker1.vm.provision "shell", inline: $script
+    worker1.vm.provider "virtualbox" do |vb|
+      vb.memory = 2048
+    end
   end
   config.vm.define "worker2" do |worker2|
     worker2.vm.hostname = "worker2"
     worker2.vm.network "forwarded_port", guest: 22, host: 2205, host_ip: "0.0.0.0"
+    # Service for Grafana
     worker2.vm.network "forwarded_port", guest: 30080, host: 30082, host_ip: "0.0.0.0"
-    worker2.vm.network "forwarded_port", guest: 8080, host: 8082, host_ip: "0.0.0.0"
+    # Service for Prometheus
+    worker2.vm.network "forwarded_port", guest: 30090, host: 30092, host_ip: "0.0.0.0"
+    # Service for Traefik Dashboard
+    worker2.vm.network "forwarded_port", guest: 30000, host: 30002, host_ip: "0.0.0.0"
+    # Service for Alertmanager
+    worker2.vm.network "forwarded_port", guest: 30093, host: 30293, host_ip: "0.0.0.0"
+ 
+    # Service for Docker Registry
+    worker2.vm.network "forwarded_port", guest: 30500, host: 30501, host_ip: "0.0.0.0"
+
+    worker2.vm.network "forwarded_port", guest: 80, host: 10082, host_ip: "0.0.0.0"
     worker2.vm.network "private_network", ip: "192.168.33.112"
     worker2.vm.provision "shell", inline: $script
+    worker2.vm.provider "virtualbox" do |vb|
+      vb.memory = 2048
+    end
   end
   config.vm.define "lb" do |lb|
     lb.vm.hostname = "lb"
@@ -119,13 +147,13 @@ Vagrant.configure("2") do |config|
   # backing providers for Vagrant. These expose provider-specific options.
   # Example for VirtualBox:
   #
-  # config.vm.provider "virtualbox" do |vb|
+  #config.vm.provider "virtualbox" do |vb|
   #   # Display the VirtualBox GUI when booting the machine
   #   vb.gui = true
   #
-  #   # Customize the amount of memory on the VM:
-  #   vb.memory = "1024"
-  # end
+    # Customize the amount of memory on the VM:
+  #  vb.memory = "1024"
+  #end
   #
   # View the documentation for the provider you are using for more
   # information on available options.
