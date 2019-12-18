@@ -61,6 +61,6 @@ spec:
     - name: web
       protocol: TCP
       port: 80
-    - name: admin
+    - name: metrics
       protocol: TCP
       port: 8080

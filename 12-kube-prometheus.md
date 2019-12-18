@@ -43,3 +43,19 @@ kubectl delete statefulsets.apps alertmanager-main
 kubectl create -f dump.yaml
 ```
 
+## Grafana plugin install
+### Install local plugin
+```
+kubectl exec -it [GRAFANA] -n monitoring sh 
+grafana-cli --pluginUrl /tmp/grafana-piechart-panel.zip plugins install grafana-piechart-panel
+```
+
+### Restart Grafana process
+```
+kubectl exec -it [GRAFANA_POD_NAME] -n monitoring -- /bin/sh -c "kill 1"
+```
+## Monitoring Traefik Configuration
+```
+kubectl apply -f yamls/servicemonitor-traefik.yaml
+kubectl apply -f yamls/traefik-metrics-service.yaml
+```

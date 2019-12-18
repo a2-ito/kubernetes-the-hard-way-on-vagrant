@@ -1,0 +1,16 @@
+*.pem
+*.csr
+*.json
+*.conf
+*.service
+*.toml
+*config.yaml
+kube-scheduler.yaml
+statefulset-alertmanager-main.yaml
+*.kubeconfig
+*.exe
+*.zip
+
+kube-prometheus/
+.vagrant/
+*.md.*

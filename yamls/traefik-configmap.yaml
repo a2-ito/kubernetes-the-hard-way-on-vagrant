@@ -8,6 +8,8 @@ data:
   traefik.toml: |
     defaultEntryPoints = ["http", "https"]
     [entryPoints]
+      [entryPoints.traefik]
+      address = ":8080"
       [entryPoints.http]
       address = ":80"
       #[entryPoints.http.redirect]
@@ -15,8 +17,16 @@ data:
       [entryPoints.https]
       address = ":443"
       [entryPoints.https.tls]
+
+    [api]
+    entryPoint = "traefik"
+
     [kubernetes]
 
+    [metrics]
+      [metrics.prometheus]
+      buckets=[0.1,0.3,1.2,5.0]
+      entryPoint = "traefik"
     [log]
 
     # Log level
