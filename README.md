@@ -6,7 +6,8 @@ This document is a version for vagrant environment of the Kubernetes the Hard Wa
 - Install CFSSL
 - Install kubectl
 
-### Software Version
+## Software Version
+
 | Server        | Type                    | Version            | 
 |:------------- | :---------------------- |:------------------ | 
 | Master,Worker | OS                      | Ubuntu 18.04.3 LTS |
